@@ -1,19 +1,27 @@
 import { useState } from 'react'
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
+import { forgotPassword as forgotPasswordApi } from '../api/auth.js'
 
 export default function ForgotPassword({ onNavigate }) {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setSubmitting(true)
-    setTimeout(() => {
-      setSubmitting(false)
+    setError('')
+    try {
+      await forgotPasswordApi(email)
       setSent(true)
-    }, 600)
+    } catch (err) {
+      const d = err.data
+      setError(d?.email?.[0] || d?.detail || 'Failed to send reset link.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -48,6 +56,12 @@ export default function ForgotPassword({ onNavigate }) {
         </>
       ) : (
         <form className="auth-form" onSubmit={handleSubmit}>
+          {error && (
+            <div className="auth-alert auth-alert--error">
+              <span>{error}</span>
+            </div>
+          )}
+
           <div className="auth-field">
             <label className="auth-label" htmlFor="forgot-email">
               Email

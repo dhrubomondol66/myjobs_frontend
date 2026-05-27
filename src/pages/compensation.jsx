@@ -1,9 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ShieldCheck, CheckCircle2 } from 'lucide-react'
+import { createCompensation } from '../api/compensation.js'
+import { fetchCompanies } from '../api/companies.js'
 
-const FRINGE = ['No benefits', '৳5k–৳15k', '৳15k–৳30k', '৳30k+']
-const BONUS = ['No bonus', '1 festival bonus', '2 festival bonuses', '2 bonuses + performance']
-const FAIRNESS = ['Way below market', 'Slightly below', 'Fair', 'Above market', 'Well above market']
+const FRINGE = [
+    { label: 'No benefits', value: 'NONE' },
+    { label: '৳5k–৳15k', value: '5K_15K' },
+    { label: '৳15k–৳30k', value: '15K_30K' },
+    { label: '৳30k+', value: '30K_PLUS' },
+]
+const BONUS = [
+    { label: 'No bonus', value: 'NONE' },
+    { label: '1 festival bonus', value: 'ONE' },
+    { label: '2 festival bonuses', value: 'TWO' },
+    { label: '2 bonuses + performance', value: 'TWO_PERFORMANCE' },
+]
+const FAIRNESS = [
+    { label: 'Way below market', value: 1 },
+    { label: 'Slightly below', value: 2 },
+    { label: 'Fair', value: 3 },
+    { label: 'Above market', value: 4 },
+    { label: 'Well above market', value: 5 },
+]
 
 const card = {
     background: 'var(--bg-card)',
@@ -13,25 +31,67 @@ const card = {
 }
 
 export default function Compensation({ requireAuth }) {
+    const [companies, setCompanies] = useState([])
     const [data, setData] = useState({
-        salary: '75000',
-        fringe: '৳5k–৳15k',
+        company: '',
+        job_title: '',
+        department: '',
+        salary: '',
+        fringe: '',
         allowances: '',
-        bonus: '2 festival bonuses',
+        bonus: '',
         fairness: '',
     })
     const [submitted, setSubmitted] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+    const [error, setError] = useState('')
 
-    const answered = [data.salary, data.fringe, data.allowances, data.bonus, data.fairness].filter(Boolean).length
-    const progress = Math.round((answered / 5) * 100)
+    useEffect(() => {
+        fetchCompanies()
+            .then((res) => {
+                const list = (Array.isArray(res) ? res : res.results || [])
+                setCompanies(list)
+                if (list.length > 0) {
+                    setData((d) => ({ ...d, company: String(list[0].id) }))
+                }
+            })
+            .catch(() => {})
+    }, [])
+
+    const fields = [data.company, data.job_title, data.department, data.salary, data.fringe, data.allowances, data.bonus, data.fairness]
+    const answered = fields.filter(Boolean).length
+    const total = fields.length
+    const progress = Math.round((answered / total) * 100)
 
     const set = (k, v) => setData(d => ({ ...d, [k]: v }))
 
     const handleSubmit = () => {
         if (progress !== 100) return
-        const complete = () => setSubmitted(true)
-        if (requireAuth) requireAuth(complete)
-        else complete()
+        const doSubmit = async () => {
+            setSubmitting(true)
+            setError('')
+            try {
+                await createCompensation({
+                    company: Number(data.company),
+                    job_title: data.job_title,
+                    department: data.department,
+                    base_salary: data.salary,
+                    fringe_benefits_value: data.fringe,
+                    other_allowances: data.allowances || '0',
+                    bonus_amount: data.bonus,
+                    market_fairness_rating: data.fairness,
+                    is_anonymous: true,
+                    year: new Date().getFullYear(),
+                })
+                setSubmitted(true)
+            } catch (err) {
+                setError(err.data?.detail || 'Failed to submit compensation data. Please try again.')
+            } finally {
+                setSubmitting(false)
+            }
+        }
+        if (requireAuth) requireAuth(doSubmit)
+        else doSubmit()
     }
 
     if (submitted) {
@@ -42,7 +102,7 @@ export default function Compensation({ requireAuth }) {
                 </div>
                 <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700 }}>Compensation data submitted!</h2>
                 <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>You earned +15 credits. Your data is aggregated anonymously.</p>
-                <button onClick={() => { setSubmitted(false); setData({ salary: '', fringe: '', allowances: '', bonus: '', fairness: '' }) }} style={{
+                <button onClick={() => { setSubmitted(false); setData({ company: companies.length ? String(companies[0].id) : '', job_title: '', department: '', salary: '', fringe: '', allowances: '', bonus: '', fairness: '' }) }} style={{
                     marginTop: 8, padding: '10px 22px', borderRadius: 'var(--radius-md)',
                     background: 'var(--accent-blue)', color: '#fff', fontWeight: 500, fontSize: 14,
                 }}>Submit again</button>
@@ -54,7 +114,7 @@ export default function Compensation({ requireAuth }) {
         <div style={{ padding: 24, maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Header */}
             <div style={card}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Compensation overview — 5 questions</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Compensation overview — {total} questions</div>
                 <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 14 }}>Share salary data to unlock full benchmarks. Earn +15 credits.</div>
                 <div style={{ height: 4, background: 'var(--bg-hover)', borderRadius: 99, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${progress}%`, background: 'var(--accent-green)', borderRadius: 99, transition: 'width 0.3s ease' }} />
@@ -69,9 +129,51 @@ export default function Compensation({ requireAuth }) {
                 </div>
             </div>
 
-            {/* Q1: Base salary */}
+            {error && (
+                <div style={{ ...card, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', padding: '12px 18px' }}>
+                    <div style={{ color: '#ef4444', fontSize: 13 }}>{error}</div>
+                </div>
+            )}
+
+            {/* Q1: Company */}
             <div style={card}>
-                <QLabel n={1} label="Base salary (monthly, BDT)" />
+                <QLabel n={1} label="Company" />
+                <select
+                    value={data.company}
+                    onChange={e => set('company', e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                >
+                    {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+            </div>
+
+            {/* Q2: Job title */}
+            <div style={card}>
+                <QLabel n={2} label="Job title" />
+                <input
+                    type="text"
+                    value={data.job_title}
+                    onChange={e => set('job_title', e.target.value)}
+                    placeholder="e.g. Software Engineer"
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                />
+            </div>
+
+            {/* Q3: Department */}
+            <div style={card}>
+                <QLabel n={3} label="Department" />
+                <input
+                    type="text"
+                    value={data.department}
+                    onChange={e => set('department', e.target.value)}
+                    placeholder="e.g. Engineering"
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                />
+            </div>
+
+            {/* Q4: Base salary */}
+            <div style={card}>
+                <QLabel n={4} label="Base salary (monthly, BDT)" />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 0, background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
                     <span style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontSize: 14, borderRight: '1px solid var(--border)', background: 'var(--bg-surface)' }}>৳</span>
                     <input
@@ -84,38 +186,39 @@ export default function Compensation({ requireAuth }) {
                 </div>
             </div>
 
-            {/* Q2: Fringe benefits */}
+            {/* Q5: Fringe benefits */}
             <div style={card}>
-                <QLabel n={2} label="Fringe benefits value (monthly estimate)" />
+                <QLabel n={5} label="Fringe benefits value (monthly estimate)" />
                 <ChipGroup options={FRINGE} value={data.fringe} onChange={v => set('fringe', v)} />
             </div>
 
-            {/* Q3: Other allowances */}
+            {/* Q6: Other allowances */}
             <div style={card}>
-                <QLabel n={3} label="Other allowances (transport, food, mobile)" />
+                <QLabel n={6} label="Other allowances (transport, food, mobile)" />
                 <input
                     type="number"
                     value={data.allowances}
                     onChange={e => set('allowances', e.target.value)}
                     placeholder="e.g. 10000"
-                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
                 />
             </div>
 
-            {/* Q4: Bonus */}
+            {/* Q7: Bonus */}
             <div style={card}>
-                <QLabel n={4} label="Annual bonus structure" />
+                <QLabel n={7} label="Annual bonus structure" />
                 <ChipGroup options={BONUS} value={data.bonus} onChange={v => set('bonus', v)} />
             </div>
 
-            {/* Q5: Fairness */}
+            {/* Q8: Fairness */}
             <div style={card}>
-                <QLabel n={5} label="How fair is your pay vs. market?" />
+                <QLabel n={8} label="How fair is your pay vs. market?" />
                 <ChipGroup options={FAIRNESS} value={data.fairness} onChange={v => set('fairness', v)} />
             </div>
 
             <button
                 onClick={handleSubmit}
+                disabled={submitting}
                 style={{
                     padding: '13px',
                     borderRadius: 'var(--radius-md)',
@@ -124,11 +227,16 @@ export default function Compensation({ requireAuth }) {
                     fontWeight: 600, fontSize: 14,
                     border: `1px solid ${progress === 100 ? 'transparent' : 'var(--border)'}`,
                     transition: 'all 0.2s',
-                    cursor: progress === 100 ? 'pointer' : 'not-allowed',
+                    cursor: progress === 100 && !submitting ? 'pointer' : 'not-allowed',
                     marginBottom: 8,
                 }}
             >
-                Submit data {progress < 100 ? `(${5 - answered} remaining)` : '· Earn +15 credits'}
+                {submitting
+                    ? 'Submitting…'
+                    : progress < 100
+                        ? `Submit data (${total - answered} remaining)`
+                        : 'Submit data · Earn +15 credits'
+                }
             </button>
         </div>
     )
@@ -147,16 +255,18 @@ function ChipGroup({ options, value, onChange }) {
     return (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {options.map(opt => {
-                const sel = value === opt
+                const optValue = typeof opt === 'object' ? opt.value : opt
+                const optLabel = typeof opt === 'object' ? opt.label : opt
+                const sel = value === optValue
                 return (
-                    <button key={opt} onClick={() => onChange(opt)} style={{
+                    <button key={optValue} onClick={() => onChange(optValue)} style={{
                         padding: '6px 16px', borderRadius: 99,
                         border: `1px solid ${sel ? 'var(--accent-blue)' : 'var(--border)'}`,
                         background: sel ? 'var(--accent-blue-dim)' : 'var(--bg-base)',
                         color: sel ? 'var(--accent-blue)' : 'var(--text-secondary)',
                         fontSize: 13, fontWeight: sel ? 500 : 400,
                         transition: 'all 0.15s',
-                    }}>{opt}</button>
+                    }}>{optLabel}</button>
                 )
             })}
         </div>

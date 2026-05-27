@@ -49,7 +49,6 @@ function App() {
   }, [navigateAuth])
 
   const enterApp = () => {
-    writeAuthenticated(true)
     setIsAuthenticated(true)
     window.location.hash = ''
     setAuthPage(null)
@@ -77,12 +76,12 @@ function App() {
 
   const renderPage = () => {
     if (activePage === 'my-profile' && !isAuthenticated) {
-      return <Dashboard onNavigate={handleNavigate} />
+      return <Dashboard />
     }
 
     switch (activePage) {
       case 'dashboard':
-        return <Dashboard onNavigate={handleNavigate} />
+        return <Dashboard />
       case 'company-review':
         return <CompanyReview requireAuth={requireAuth} />
       case 'compensation':
@@ -92,7 +91,7 @@ function App() {
       case 'my-profile':
         return <MyProfile onLogout={handleLogout} />
       default:
-        return <Dashboard onNavigate={handleNavigate} />
+        return <Dashboard />
     }
   }
 

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Lock, Eye, EyeOff, ArrowLeft, KeyRound } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
+import { resetPassword as resetPasswordApi } from '../api/auth.js'
 
 function getPasswordStrength(password) {
   if (!password) return { score: 0, label: '' }
@@ -14,52 +15,86 @@ function getPasswordStrength(password) {
 }
 
 export default function ResetPassword({ onNavigate, onAuthenticated }) {
-  const [code, setCode] = useState('')
+  const [uid, setUid] = useState('')
+  const [token, setToken] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   const strength = useMemo(() => getPasswordStrength(password), [password])
   const passwordsMatch = !confirm || password === confirm
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (password !== confirm) return
     setSubmitting(true)
-    setTimeout(() => {
-      setSubmitting(false)
+    setError('')
+    try {
+      await resetPasswordApi({
+        uid,
+        token,
+        new_password: password,
+        confirm_password: confirm,
+      })
       onAuthenticated?.()
-    }, 600)
+    } catch (err) {
+      const d = err.data
+      if (Array.isArray(d)) {
+        setError(d[0])
+      } else {
+        setError(d?.detail || d?.non_field_errors?.[0] || 'Reset failed. Check your code and try again.')
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <AuthLayout
       title="Set a new password"
-      subtitle="Enter the code from your email and choose a new password."
+      subtitle="Enter the UID and token from your reset email and choose a new password."
     >
       <div className="auth-alert auth-alert--info">
         <KeyRound size={18} style={{ flexShrink: 0 }} />
-        <span>Reset codes expire after 30 minutes for your security.</span>
+        <span>Reset links expire after 30 minutes for your security.</span>
       </div>
 
       <form className="auth-form" onSubmit={handleSubmit}>
+        {error && (
+          <div className="auth-alert auth-alert--error">
+            <span>{error}</span>
+          </div>
+        )}
+
         <div className="auth-field">
-          <label className="auth-label" htmlFor="reset-code">
-            Reset code
+          <label className="auth-label" htmlFor="reset-uid">
+            UID (from reset link)
           </label>
           <input
-            id="reset-code"
+            id="reset-uid"
             className="auth-input auth-input--icon"
             type="text"
-            placeholder="6-digit code"
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            inputMode="numeric"
-            autoComplete="one-time-code"
+            placeholder="UID from email link"
+            value={uid}
+            onChange={(e) => setUid(e.target.value)}
             required
-            minLength={6}
-            maxLength={6}
+          />
+        </div>
+
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="reset-token">
+            Token (from reset link)
+          </label>
+          <input
+            id="reset-token"
+            className="auth-input auth-input--icon"
+            type="text"
+            placeholder="Token from email link"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            required
           />
         </div>
 
@@ -134,7 +169,7 @@ export default function ResetPassword({ onNavigate, onAuthenticated }) {
         <button
           type="submit"
           className="auth-btn auth-btn--primary"
-          disabled={submitting || !passwordsMatch || code.length < 6}
+          disabled={submitting || !passwordsMatch || !uid || !token}
         >
           {submitting ? 'Updating…' : 'Update password'}
         </button>

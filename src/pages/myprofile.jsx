@@ -1,54 +1,7 @@
+import { useState, useEffect } from 'react'
 import { LogOut } from 'lucide-react'
-
-const PROFILE_DATA = {
-  name: 'Ahmed Karim',
-  role: 'Software engineer',
-  experience: '5 years experience',
-  email: 'ahmed.karim@gmail.com',
-  initials: 'AK',
-  credits: 45,
-  reviewsSubmitted: 3,
-  insightsUnlocked: 12,
-}
-
-const ACTIVITIES = [
-  {
-    id: 1,
-    title: 'Reviewed Grameenphone Ltd.',
-    time: '2 days ago',
-    change: 10,
-    type: 'review',
-    initials: 'GR',
-    color: 'var(--accent-blue)',
-  },
-  {
-    id: 2,
-    title: 'Submitted compensation data',
-    time: '5 days ago',
-    change: 15,
-    type: 'salary',
-    initials: '৳',
-    color: 'var(--accent-green)',
-  },
-  {
-    id: 3,
-    title: 'Unlocked BRAC salary data',
-    time: '1 week ago',
-    change: -5,
-    type: 'unlock',
-    initials: 'BR',
-    color: 'var(--accent-purple)',
-  },
-  {
-    id: 4,
-    title: 'Reviewed Dutch-Bangla Bank',
-    time: '2 weeks ago',
-    change: 10,
-    type: 'review',
-    initials: 'DU',
-    color: 'var(--accent-blue)',
-  },
-]
+import { fetchMyProfile } from '../api/profile.js'
+import { getUser } from '../auth/authStorage.js'
 
 const cardStyle = {
   background: 'var(--bg-card)',
@@ -58,7 +11,46 @@ const cardStyle = {
   boxShadow: 'var(--shadow-card)',
 }
 
+function getInitials(name) {
+  if (!name) return '?'
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+}
+
 export default function MyProfile({ onLogout }) {
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const user = getUser()
+
+  useEffect(() => {
+    fetchMyProfile()
+      .then(setProfile)
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const displayName = profile?.full_name || user?.username || 'User'
+  const email = user?.email || ''
+  const designation = profile?.current_designation || ''
+  const industry = profile?.current_industry || user?.industry || ''
+  const company = profile?.current_company || ''
+  const city = profile?.city || ''
+  const workStatus = profile?.current_work_status || ''
+  const credits = user?.credits ?? 0
+  const initials = getInitials(displayName)
+
+  if (loading) {
+    return (
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+        Loading profile…
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 840 }}>
       {/* Profile Info Card */}
@@ -79,17 +71,17 @@ export default function MyProfile({ onLogout }) {
             flexShrink: 0,
           }}
         >
-          {PROFILE_DATA.initials}
+          {initials}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-primary)' }}>
-            {PROFILE_DATA.name}
+            {displayName}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
-            {PROFILE_DATA.role} · {PROFILE_DATA.experience}
+            {[designation, industry, company].filter(Boolean).join(' · ') || workStatus}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-            {PROFILE_DATA.email}
+            {[email, city].filter(Boolean).join(' · ')}
           </div>
         </div>
         <button
@@ -132,93 +124,68 @@ export default function MyProfile({ onLogout }) {
         {/* Credits */}
         <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 20px' }}>
           <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent-blue)', fontFamily: 'var(--font-display)' }}>
-            {PROFILE_DATA.credits}
+            {credits}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>
             Credits available
           </div>
         </div>
 
-        {/* Reviews */}
+        {/* Work status */}
         <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 20px' }}>
           <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent-green)', fontFamily: 'var(--font-display)' }}>
-            {PROFILE_DATA.reviewsSubmitted}
+            {workStatus === 'WORKING' ? 'Employed' : workStatus === 'UNEMPLOYED' ? 'Searching' : '—'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>
-            Reviews submitted
+            Work status
           </div>
         </div>
 
-        {/* Insights */}
+        {/* Verified */}
         <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 20px' }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent-amber)', fontFamily: 'var(--font-display)' }}>
-            {PROFILE_DATA.insightsUnlocked}
+          <div style={{ fontSize: 28, fontWeight: 700, color: profile?.is_verified ? 'var(--accent-green)' : 'var(--accent-amber)', fontFamily: 'var(--font-display)' }}>
+            {profile?.is_verified ? 'Yes' : 'No'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6, fontWeight: 500 }}>
-            Insights unlocked
+            Verified
           </div>
         </div>
       </div>
 
-      {/* Activity History Card */}
-      <div style={{ ...cardStyle, padding: '20px 24px' }}>
-        <div style={{ fontSize: 14, fontWeight: 650, color: 'var(--text-primary)', marginBottom: 18 }}>
-          Activity history
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {ACTIVITIES.map((activity) => (
-            <div
-              key={activity.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingBottom: 12,
-                borderBottom: '1px solid var(--border-subtle)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                {/* Visual placeholder box for brand/activity type */}
+      {/* Profile Details Card */}
+      {profile && (
+        <div style={{ ...cardStyle, padding: '20px 24px' }}>
+          <div style={{ fontSize: 14, fontWeight: 650, color: 'var(--text-primary)', marginBottom: 18 }}>
+            Profile details
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {[
+              { label: 'Full name', value: profile.full_name },
+              { label: 'Designation', value: profile.current_designation },
+              { label: 'Industry', value: profile.current_industry },
+              { label: 'Company', value: profile.current_company },
+              { label: 'City', value: profile.city },
+              { label: 'Current salary', value: profile.current_salary ? `৳${Number(profile.current_salary).toLocaleString()}` : null },
+            ]
+              .filter((row) => row.value)
+              .map((row) => (
                 <div
+                  key={row.label}
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 6,
-                    background: 'var(--bg-hover)',
-                    border: '1px solid var(--border-subtle)',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: activity.color || 'var(--text-secondary)',
-                    flexShrink: 0,
+                    justifyContent: 'space-between',
+                    paddingBottom: 12,
+                    borderBottom: '1px solid var(--border-subtle)',
                   }}
                 >
-                  {activity.initials}
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{row.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{row.value}</span>
                 </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
-                    {activity.title}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-                    {activity.time}
-                  </div>
-                </div>
-              </div>
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: activity.change > 0 ? 'var(--accent-green)' : '#ef4444',
-                }}
-              >
-                {activity.change > 0 ? `+${activity.change}` : activity.change}
-              </div>
-            </div>
-          ))}
+              ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

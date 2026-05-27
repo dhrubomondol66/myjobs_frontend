@@ -1,74 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, Search } from 'lucide-react'
-
-const COMPANIES_DATA = [
-  {
-    id: 'grameenphone',
-    name: 'Grameenphone Ltd.',
-    tag: 'MNC',
-    industry: 'Telecom',
-    employees: '5,000+ employees',
-    reviewsCount: 312,
-    reputation: 88,
-    recommend: 87,
-    initials: 'GR',
-  },
-  {
-    id: 'brac',
-    name: 'BRAC',
-    tag: 'NGO',
-    industry: 'Development',
-    employees: '10,000+ employees',
-    reviewsCount: 198,
-    reputation: 83,
-    recommend: 91,
-    initials: 'BR',
-  },
-  {
-    id: 'dutch-bangla',
-    name: 'Dutch-Bangla Bank',
-    tag: 'Local',
-    industry: 'Banking',
-    employees: '3,000+ employees',
-    reviewsCount: 156,
-    reputation: 79,
-    recommend: 78,
-    initials: 'DU',
-  },
-  {
-    id: 'robi',
-    name: 'Robi Axiata',
-    tag: 'MNC',
-    industry: 'Telecom',
-    employees: '2,000+ employees',
-    reviewsCount: 134,
-    reputation: 76,
-    recommend: 72,
-    initials: 'RO',
-  },
-  {
-    id: 'square',
-    name: 'Square Group',
-    tag: 'Local',
-    industry: 'Conglomerate',
-    employees: '8,000+ employees',
-    reviewsCount: 210,
-    reputation: 74,
-    recommend: 75,
-    initials: 'SQ',
-  },
-  {
-    id: 'aci',
-    name: 'ACI Limited',
-    tag: 'Local',
-    industry: 'FMCG',
-    employees: '4,000+ employees',
-    reviewsCount: 89,
-    reputation: 71,
-    recommend: 68,
-    initials: 'AC',
-  },
-]
+import { fetchCompanies } from '../api/companies.js'
 
 const getTagStyles = (tag) => {
   switch (tag) {
@@ -82,6 +14,7 @@ const getTagStyles = (tag) => {
         color: 'var(--accent-purple)',
         background: 'var(--accent-purple-dim)',
       }
+    case 'LOCAL':
     case 'Local':
     default:
       return {
@@ -91,11 +24,46 @@ const getTagStyles = (tag) => {
   }
 }
 
+function getInitials(name) {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+}
+
 export default function Companies() {
+  const [companies, setCompanies] = useState([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [industry, setIndustry] = useState('All')
 
-  const filteredCompanies = COMPANIES_DATA.filter((company) => {
+  useEffect(() => {
+    let cancelled = false
+    fetchCompanies()
+      .then((data) => {
+        if (cancelled) return
+        const list = (Array.isArray(data) ? data : data.results || []).map((c) => ({
+          id: c.id,
+          name: c.name,
+          tag: c.type || 'Local',
+          industry: c.industry || '',
+          employees: c.manpower_size ? `${c.manpower_size} employees` : '',
+          initials: getInitials(c.name),
+          reputation: c.rating ?? '—',
+          headquarters: c.headquarters || '',
+        }))
+        setCompanies(list)
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const industries = ['All', ...new Set(companies.map((c) => c.industry).filter(Boolean))]
+
+  const filteredCompanies = companies.filter((company) => {
     const matchesSearch = company.name.toLowerCase().includes(search.toLowerCase())
     const matchesIndustry = industry === 'All' || company.industry === industry
     return matchesSearch && matchesIndustry
@@ -159,12 +127,11 @@ export default function Companies() {
             onFocus={(e) => (e.target.style.borderColor = 'var(--accent-blue)')}
             onBlur={(e) => (e.target.style.borderColor = 'var(--border-subtle)')}
           >
-            <option value="All">All industries</option>
-            <option value="Telecom">Telecom</option>
-            <option value="Development">Development</option>
-            <option value="Banking">Banking</option>
-            <option value="Conglomerate">Conglomerate</option>
-            <option value="FMCG">FMCG</option>
+            {industries.map((ind) => (
+              <option key={ind} value={ind}>
+                {ind === 'All' ? 'All industries' : ind}
+              </option>
+            ))}
           </select>
           <ChevronDown
             size={14}
@@ -180,9 +147,15 @@ export default function Companies() {
         </div>
       </div>
 
+      {loading && (
+        <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40, fontSize: 14 }}>
+          Loading companies…
+        </div>
+      )}
+
       {/* Companies List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {filteredCompanies.length > 0 ? (
+        {!loading && filteredCompanies.length > 0 ? (
           filteredCompanies.map((company) => (
             <div
               key={company.id}
@@ -245,47 +218,36 @@ export default function Companies() {
                   </span>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                  {company.industry} · {company.employees} · {company.reviewsCount} reviews
+                  {[company.industry, company.employees, company.headquarters].filter(Boolean).join(' · ')}
                 </div>
               </div>
 
-              {/* Scores Column */}
-              <div style={{ display: 'flex', gap: 32 }}>
-                {/* Reputation */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent-blue)' }}>
-                    {company.reputation}
-                  </span>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                    reputation
-                  </span>
-                </div>
-
-                {/* Recommend */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent-green)' }}>
-                    {company.recommend}%
-                  </span>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                    recommend
-                  </span>
-                </div>
+              {/* Rating */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent-blue)' }}>
+                  {company.reputation}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
+                  rating
+                </span>
               </div>
             </div>
           ))
         ) : (
-          <div
-            style={{
-              padding: '40px 20px',
-              textAlign: 'center',
-              color: 'var(--text-muted)',
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: 'var(--radius-lg)',
-            }}
-          >
-            No companies found matching search criteria.
-          </div>
+          !loading && (
+            <div
+              style={{
+                padding: '40px 20px',
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-lg)',
+              }}
+            >
+              No companies found matching search criteria.
+            </div>
+          )
         )}
       </div>
     </div>

@@ -1,20 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ShieldCheck, ChevronDown } from 'lucide-react'
-
-const COMPANIES = ['Grameenphone Ltd.', 'BRAC', 'Dutch-Bangla Bank', 'Robi Axiata', 'Square Group', 'ACI Limited']
-const TYPES = ['Local', 'MNC', 'Startup', 'NGO', 'Government']
+import { createReview } from '../api/reviews.js'
+import { fetchCompanies } from '../api/companies.js'
 
 const QUESTIONS = [
-    { id: 'q1', label: 'Which company are you reviewing?', type: 'dropdown' },
-    { id: 'q2', label: 'Company brand value', type: 'rating' },
-    { id: 'q3', label: 'Type of company', type: 'chips', options: TYPES },
-    { id: 'q4', label: 'Work environment score', type: 'rating' },
-    { id: 'q5', label: 'Career growth opportunities', type: 'rating' },
-    { id: 'q6', label: 'Work-life balance', type: 'rating' },
-    { id: 'q7', label: 'Management quality', type: 'rating' },
-    { id: 'q8', label: 'Salary & benefits satisfaction', type: 'rating' },
-    { id: 'q9', label: 'Would you recommend this company?', type: 'chips', options: ['Definitely', 'Probably', 'Neutral', 'Probably not', 'No'] },
-    { id: 'q10', label: 'Overall experience', type: 'rating' },
+    { id: 'company', label: 'Which company are you reviewing?', type: 'dropdown' },
+    { id: 'brand_value', label: 'Company brand value', type: 'rating' },
+    { id: 'work_environment', label: 'Work environment score', type: 'rating' },
+    { id: 'career_growth', label: 'Career growth opportunities', type: 'rating' },
+    { id: 'salary_range_perception', label: 'Salary & benefits satisfaction', type: 'rating' },
+    { id: 'fringe_benefits', label: 'Fringe benefits quality', type: 'rating' },
+    { id: 'job_security', label: 'Job security', type: 'rating' },
+    { id: 'employee_respect', label: 'Employee respect & management quality', type: 'rating' },
+    { id: 'overall_recommendation', label: 'Would you recommend this company?', type: 'chips', options: ['Yes', 'No'] },
 ]
 
 const card = {
@@ -25,8 +23,23 @@ const card = {
 }
 
 export default function CompanyReview({ requireAuth }) {
-    const [answers, setAnswers] = useState({ q1: 'Grameenphone Ltd.', q3: 'MNC' })
+    const [companies, setCompanies] = useState([])
+    const [answers, setAnswers] = useState({})
     const [submitted, setSubmitted] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+    const [error, setError] = useState('')
+
+    useEffect(() => {
+        fetchCompanies()
+            .then((data) => {
+                const list = (Array.isArray(data) ? data : data.results || [])
+                setCompanies(list)
+                if (list.length > 0) {
+                    setAnswers((a) => ({ ...a, company: list[0].name }))
+                }
+            })
+            .catch(() => {})
+    }, [])
 
     const answered = Object.keys(answers).length
     const progress = Math.round((answered / QUESTIONS.length) * 100)
@@ -35,9 +48,31 @@ export default function CompanyReview({ requireAuth }) {
 
     const handleSubmit = () => {
         if (progress !== 100) return
-        const complete = () => setSubmitted(true)
-        if (requireAuth) requireAuth(complete)
-        else complete()
+        const doSubmit = async () => {
+            setSubmitting(true)
+            setError('')
+            try {
+                await createReview({
+                    company: answers.company,
+                    brand_value: answers.brand_value,
+                    work_environment: answers.work_environment,
+                    career_growth: answers.career_growth,
+                    salary_range_perception: answers.salary_range_perception,
+                    fringe_benefits: answers.fringe_benefits,
+                    job_security: answers.job_security,
+                    employee_respect: answers.employee_respect,
+                    overall_recommendation: answers.overall_recommendation === 'Yes',
+                    is_anonymous: true,
+                })
+                setSubmitted(true)
+            } catch (err) {
+                setError(err.data?.detail || 'Failed to submit review. Please try again.')
+            } finally {
+                setSubmitting(false)
+            }
+        }
+        if (requireAuth) requireAuth(doSubmit)
+        else doSubmit()
     }
 
     if (submitted) {
@@ -48,7 +83,7 @@ export default function CompanyReview({ requireAuth }) {
                 </div>
                 <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700 }}>Review submitted!</h2>
                 <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>You earned +10 credits. Your identity stays completely anonymous.</p>
-                <button onClick={() => { setSubmitted(false); setAnswers({ q1: 'Grameenphone Ltd.', q3: 'MNC' }) }} style={{
+                <button onClick={() => { setSubmitted(false); setAnswers(companies.length ? { company: companies[0].name } : {}) }} style={{
                     marginTop: 8,
                     padding: '10px 22px',
                     borderRadius: 'var(--radius-md)',
@@ -65,10 +100,10 @@ export default function CompanyReview({ requireAuth }) {
         <div style={{ padding: 24, maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Header card */}
             <div style={{ ...card, background: 'var(--bg-card)' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Company overview — 10 questions</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Company overview — {QUESTIONS.length} questions</div>
                 <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 14 }}>Your identity stays completely anonymous. Earn +10 credits on submit.</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-                    <span>{answered}/10 answered</span>
+                    <span>{answered}/{QUESTIONS.length} answered</span>
                     <span style={{ color: 'var(--accent-blue)' }}>{progress}%</span>
                 </div>
                 <div style={{ height: 4, background: 'var(--bg-hover)', borderRadius: 99, overflow: 'hidden' }}>
@@ -83,6 +118,12 @@ export default function CompanyReview({ requireAuth }) {
                     Anonymous submission — your name will never be shown
                 </div>
             </div>
+
+            {error && (
+                <div style={{ ...card, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', padding: '12px 18px' }}>
+                    <div style={{ color: '#ef4444', fontSize: 13 }}>{error}</div>
+                </div>
+            )}
 
             {/* Questions */}
             {QUESTIONS.map((q, qi) => (
@@ -110,7 +151,7 @@ export default function CompanyReview({ requireAuth }) {
                                     outline: 'none',
                                 }}
                             >
-                                {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                {companies.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                             </select>
                             <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
                         </div>
@@ -161,6 +202,7 @@ export default function CompanyReview({ requireAuth }) {
             {/* Submit */}
             <button
                 onClick={handleSubmit}
+                disabled={submitting}
                 style={{
                     padding: '13px',
                     borderRadius: 'var(--radius-md)',
@@ -170,11 +212,16 @@ export default function CompanyReview({ requireAuth }) {
                     fontSize: 14,
                     border: `1px solid ${progress === 100 ? 'transparent' : 'var(--border)'}`,
                     transition: 'all 0.2s',
-                    cursor: progress === 100 ? 'pointer' : 'not-allowed',
+                    cursor: progress === 100 && !submitting ? 'pointer' : 'not-allowed',
                     marginBottom: 8,
                 }}
             >
-                Submit review {progress < 100 ? `(${10 - answered} remaining)` : '· Earn +10 credits'}
+                {submitting
+                    ? 'Submitting…'
+                    : progress < 100
+                        ? `Submit review (${QUESTIONS.length - answered} remaining)`
+                        : 'Submit review · Earn +10 credits'
+                }
             </button>
         </div>
     )

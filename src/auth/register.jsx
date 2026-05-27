@@ -1,6 +1,9 @@
 import { useState, useMemo } from 'react'
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
+import { register as registerApi } from '../api/auth.js'
+import { login as loginApi } from '../api/auth.js'
+import { saveTokens, saveUser } from './authStorage.js'
 
 function getPasswordStrength(password) {
   if (!password) return { score: 0, label: '' }
@@ -21,18 +24,41 @@ export default function Register({ onNavigate, onAuthenticated }) {
   const [showPassword, setShowPassword] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   const strength = useMemo(() => getPasswordStrength(password), [password])
   const passwordsMatch = !confirm || password === confirm
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!agreed || password !== confirm) return
     setSubmitting(true)
-    setTimeout(() => {
-      setSubmitting(false)
+    setError('')
+    try {
+      await registerApi({ username: name, email, password })
+      const data = await loginApi(email, password)
+      saveTokens({ access: data.access, refresh: data.refresh })
+      saveUser({
+        id: data.user_id,
+        username: data.username,
+        email: data.email,
+        industry: data.industry,
+        years_of_experience: data.years_of_experience,
+        is_verified: data.is_verified,
+        credits: data.credits,
+      })
       onAuthenticated?.()
-    }, 600)
+    } catch (err) {
+      const d = err.data
+      if (d) {
+        const msg = d.email?.[0] || d.username?.[0] || d.password?.[0] || d.detail || 'Registration failed.'
+        setError(msg)
+      } else {
+        setError('Registration failed. Please try again.')
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -41,6 +67,12 @@ export default function Register({ onNavigate, onAuthenticated }) {
       subtitle="Join MYJOBS to share reviews and unlock workplace insights."
     >
       <form className="auth-form" onSubmit={handleSubmit}>
+        {error && (
+          <div className="auth-alert auth-alert--error">
+            <span>{error}</span>
+          </div>
+        )}
+
         <div className="auth-field">
           <label className="auth-label" htmlFor="register-name">
             Full name

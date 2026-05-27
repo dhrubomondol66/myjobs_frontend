@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
+import { login as loginApi } from '../api/auth.js'
+import { saveTokens, saveUser } from './authStorage.js'
 
 export default function Login({ onNavigate, onAuthenticated }) {
   const [email, setEmail] = useState('')
@@ -8,14 +10,30 @@ export default function Login({ onNavigate, onAuthenticated }) {
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setSubmitting(true)
-    setTimeout(() => {
-      setSubmitting(false)
+    setError('')
+    try {
+      const data = await loginApi(email, password)
+      saveTokens({ access: data.access, refresh: data.refresh })
+      saveUser({
+        id: data.user_id,
+        username: data.username,
+        email: data.email,
+        industry: data.industry,
+        years_of_experience: data.years_of_experience,
+        is_verified: data.is_verified,
+        credits: data.credits,
+      })
       onAuthenticated?.()
-    }, 600)
+    } catch (err) {
+      setError(err.data?.detail || 'Invalid email or password.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -24,6 +42,12 @@ export default function Login({ onNavigate, onAuthenticated }) {
       subtitle="Sign in to submit reviews and unlock salary insights."
     >
       <form className="auth-form" onSubmit={handleSubmit}>
+        {error && (
+          <div className="auth-alert auth-alert--error">
+            <span>{error}</span>
+          </div>
+        )}
+
         <div className="auth-field">
           <label className="auth-label" htmlFor="login-email">
             Email
