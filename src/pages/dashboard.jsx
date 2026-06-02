@@ -137,7 +137,7 @@ export default function Dashboard({ onNavigate }) {
                 <div style={{ ...card, textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
                     <div style={{ marginBottom: 8, fontSize: 14 }}>{error}</div>
                     <button
-                        onClick={() => window.location.reload()}
+                        onClick={() => onNavigate('login')}
                         style={{
                             padding: '8px 18px',
                             borderRadius: 'var(--radius-md)',
@@ -148,7 +148,9 @@ export default function Dashboard({ onNavigate }) {
                             fontWeight: 500,
                             cursor: 'pointer',
                         }}
-                    >Retry</button>
+                    >
+                        Please login to view the dashboard
+                    </button>
                 </div>
             </div>
         )
