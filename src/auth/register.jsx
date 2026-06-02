@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
-import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, User, Briefcase, CalendarClock, Eye, EyeOff } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
+import { registerUser, loginUser } from '../service/auth.js'
+import { setAuthTokens } from './authStorage.js'
 
 function getPasswordStrength(password) {
   if (!password) return { score: 0, label: '' }
@@ -14,25 +16,48 @@ function getPasswordStrength(password) {
 }
 
 export default function Register({ onNavigate, onAuthenticated }) {
-  const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [industry, setIndustry] = useState('')
+  const [yearsOfExperience, setYearsOfExperience] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   const strength = useMemo(() => getPasswordStrength(password), [password])
   const passwordsMatch = !confirm || password === confirm
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!agreed || password !== confirm) return
+    setError('')
     setSubmitting(true)
-    setTimeout(() => {
-      setSubmitting(false)
+    try {
+      const payload = {
+        username,
+        email,
+        password,
+        industry,
+        years_of_experience: yearsOfExperience === '' ? null : Number(yearsOfExperience),
+      }
+      await registerUser(payload)
+
+      // Auto-login after successful registration (best UX).
+      const { data } = await loginUser({ email, password })
+      setAuthTokens({ access: data?.access, refresh: data?.refresh })
       onAuthenticated?.()
-    }, 600)
+    } catch (err) {
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        'Registration failed. Please check your details and try again.'
+      setError(String(message))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -40,23 +65,71 @@ export default function Register({ onNavigate, onAuthenticated }) {
       title="Create your account"
       subtitle="Join MYJOBS to share reviews and unlock workplace insights."
     >
+      {error && (
+        <div className="auth-alert auth-alert--info" style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)' }}>
+          {error}
+        </div>
+      )}
       <form className="auth-form" onSubmit={handleSubmit}>
         <div className="auth-field">
-          <label className="auth-label" htmlFor="register-name">
-            Full name
+          <label className="auth-label" htmlFor="register-username">
+            Username
           </label>
           <div className="auth-input-wrap">
             <span className="auth-input-icon" aria-hidden="true">
               <User size={16} />
             </span>
             <input
-              id="register-name"
+              id="register-username"
               className="auth-input"
               type="text"
-              placeholder="Ahmed Karim"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="name"
+              placeholder="ahmed_karim"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="register-industry">
+            Industry
+          </label>
+          <div className="auth-input-wrap">
+            <span className="auth-input-icon" aria-hidden="true">
+              <Briefcase size={16} />
+            </span>
+            <input
+              id="register-industry"
+              className="auth-input"
+              type="text"
+              placeholder="e.g. Telecom, Banking, Tech"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              required
+            />
+          </div>
+        </div>
+
+        <div className="auth-field">
+          <label className="auth-label" htmlFor="register-yoe">
+            Years of experience
+          </label>
+          <div className="auth-input-wrap">
+            <span className="auth-input-icon" aria-hidden="true">
+              <CalendarClock size={16} />
+            </span>
+            <input
+              id="register-yoe"
+              className="auth-input"
+              type="number"
+              min={0}
+              max={60}
+              step={1}
+              placeholder="e.g. 5"
+              value={yearsOfExperience}
+              onChange={(e) => setYearsOfExperience(e.target.value)}
               required
             />
           </div>

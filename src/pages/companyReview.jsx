@@ -1,8 +1,17 @@
-import { useState } from 'react'
-import { ShieldCheck, ChevronDown } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ShieldCheck, ChevronDown, Loader2 } from 'lucide-react'
+import { createReview } from '../service/companyReviews.js'
+import { getCompanies } from '../service/companies.js'
 
-const COMPANIES = ['Grameenphone Ltd.', 'BRAC', 'Dutch-Bangla Bank', 'Robi Axiata', 'Square Group', 'ACI Limited']
 const TYPES = ['Local', 'MNC', 'Startup', 'NGO', 'Government']
+
+const recommendationMap = {
+    'Definitely': 'definitely',
+    'Probably': 'probably',
+    'Neutral': 'neutral',
+    'Probably not': 'probably_not',
+    'No': 'no',
+}
 
 const QUESTIONS = [
     { id: 'q1', label: 'Which company are you reviewing?', type: 'dropdown' },
@@ -24,20 +33,119 @@ const card = {
     padding: '18px 22px',
 }
 
-export default function CompanyReview({ requireAuth }) {
-    const [answers, setAnswers] = useState({ q1: 'Grameenphone Ltd.', q3: 'MNC' })
+// FIX: added onNavigate prop
+export default function CompanyReview({ requireAuth, onReviewComplete, onNavigate }) {
+    const [companies, setCompanies] = useState([])
+    const [loadingCompanies, setLoadingCompanies] = useState(true)
+    const [answers, setAnswers] = useState({ q3: 'MNC' })
     const [submitted, setSubmitted] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+    const [submitError, setSubmitError] = useState('')
 
-    const answered = Object.keys(answers).length
+    // FIX: removed the stray top-level `await createReview(payload)` and related
+    // dead code that was executing outside any function on every render
+
+    useEffect(() => {
+        let mounted = true
+        async function loadCompanies() {
+            setLoadingCompanies(true)
+            try {
+                const { data } = await getCompanies()
+                if (!mounted) return
+                const list = (data || []).map(c => ({
+                    id: c.id,
+                    name: c.name || c.company_name || 'Unknown',
+                }))
+                setCompanies(list)
+                if (list.length > 0) {
+                    setAnswers(a => ({ ...a, q1: list[0].name }))
+                }
+            } catch {
+                if (!mounted) return
+                setCompanies([])
+            } finally {
+                if (!mounted) return
+                setLoadingCompanies(false)
+            }
+        }
+        loadCompanies()
+        return () => { mounted = false }
+    }, [])
+
+    const isAnswered = (qId) => {
+        const val = answers[qId]
+        return val !== undefined && val !== null && val !== ''
+    }
+
+    const allQuestionsAnswered = QUESTIONS.every(q => isAnswered(q.id))
+    const answered = QUESTIONS.filter(q => isAnswered(q.id)).length
     const progress = Math.round((answered / QUESTIONS.length) * 100)
 
     const set = (id, val) => setAnswers(a => ({ ...a, [id]: val }))
 
-    const handleSubmit = () => {
-        if (progress !== 100) return
-        const complete = () => setSubmitted(true)
-        if (requireAuth) requireAuth(complete)
-        else complete()
+    const handleSubmit = async (e) => {
+        e?.preventDefault?.()
+
+        if (!allQuestionsAnswered) {
+            setSubmitError(`Please answer all questions. (${answered}/${QUESTIONS.length} answered)`)
+            return
+        }
+
+        setSubmitError('')
+        setSubmitting(true)
+
+        try {
+            const payload = {
+                company: answers.q1,
+                is_anonymous: true,
+                company_type: answers.q3.toLowerCase(),
+                brand_value: Number(answers.q2),
+                work_environment: Number(answers.q4),
+                career_growth: Number(answers.q5),
+                work_life_balance: Number(answers.q6),
+                management_quality: Number(answers.q7),
+                salary_benefits: Number(answers.q8),
+                recommendation: recommendationMap[answers.q9],
+                overall_experience: Number(answers.q10),
+            }
+
+            const hasNaN = Object.entries(payload).some(([, val]) =>
+                typeof val === 'number' && isNaN(val)
+            )
+            if (hasNaN) {
+                setSubmitError('Invalid rating values. Please check all questions are answered correctly.')
+                setSubmitting(false)
+                return
+            }
+
+            await createReview(payload)
+
+            // FIX: removed duplicate createReview call and stray code from top level.
+            // Now we find the company, store its id and name, and notify the parent to navigate.
+            const selectedCompany = companies.find(c => c.name === answers.q1)
+            if (selectedCompany) {
+                localStorage.setItem('review_company_id', selectedCompany.id)
+                localStorage.setItem('review_company_name', selectedCompany.name)
+                onReviewComplete(selectedCompany.id)  // tells parent: review done, here's the id
+                // FIX: use onNavigate (prop) instead of the undefined onNavigate from nowhere
+                onNavigate('compensation')
+                return
+            }
+
+            // Fallback: if company not found in list (e.g. typed manually), just show success
+            setSubmitted(true)
+        } catch (err) {
+            const message =
+                err?.response?.data?.detail ||
+                err?.response?.data?.message ||
+                err?.response?.data?.error ||
+                JSON.stringify(err?.response?.data) ||
+                err?.message ||
+                'Failed to submit review. Please try again.'
+            setSubmitError(String(message))
+        } finally {
+            setSubmitting(false)
+        }
     }
 
     if (submitted) {
@@ -48,23 +156,23 @@ export default function CompanyReview({ requireAuth }) {
                 </div>
                 <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700 }}>Review submitted!</h2>
                 <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>You earned +10 credits. Your identity stays completely anonymous.</p>
-                <button onClick={() => { setSubmitted(false); setAnswers({ q1: 'Grameenphone Ltd.', q3: 'MNC' }) }} style={{
-                    marginTop: 8,
-                    padding: '10px 22px',
-                    borderRadius: 'var(--radius-md)',
-                    background: 'var(--accent-blue)',
-                    color: '#fff',
-                    fontWeight: 500,
-                    fontSize: 14,
-                }}>Submit another review</button>
+                <button
+                    onClick={() => {
+                        setSubmitted(false)
+                        setAnswers(companies.length ? { q1: companies[0].name, q3: 'MNC' } : { q3: 'MNC' })
+                        setSubmitError('')
+                    }}
+                    style={{ marginTop: 8, padding: '10px 22px', borderRadius: 'var(--radius-md)', background: 'var(--accent-blue)', color: '#fff', fontWeight: 500, fontSize: 14, border: 'none', cursor: 'pointer' }}
+                >
+                    Submit another review
+                </button>
             </div>
         )
     }
 
     return (
         <div style={{ padding: 24, maxWidth: 640, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Header card */}
-            <div style={{ ...card, background: 'var(--bg-card)' }}>
+            <div style={{ ...card }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Company overview — 10 questions</div>
                 <div style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 14 }}>Your identity stays completely anonymous. Earn +10 credits on submit.</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -76,7 +184,6 @@ export default function CompanyReview({ requireAuth }) {
                 </div>
             </div>
 
-            {/* Anonymous notice */}
             <div style={{ ...card, background: 'rgba(34,201,122,0.08)', border: '1px solid rgba(34,201,122,0.2)', padding: '12px 18px' }}>
                 <div style={{ color: 'var(--accent-green)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <ShieldCheck size={14} />
@@ -84,7 +191,12 @@ export default function CompanyReview({ requireAuth }) {
                 </div>
             </div>
 
-            {/* Questions */}
+            {submitError && (
+                <div style={{ ...card, borderColor: 'rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.04)', color: '#ef4444', fontSize: 13 }}>
+                    {submitError}
+                </div>
+            )}
+
             {QUESTIONS.map((q, qi) => (
                 <div key={q.id} style={card}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -94,25 +206,32 @@ export default function CompanyReview({ requireAuth }) {
 
                     {q.type === 'dropdown' && (
                         <div style={{ position: 'relative' }}>
-                            <select
-                                value={answers[q.id] || ''}
-                                onChange={e => set(q.id, e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px 36px 10px 14px',
-                                    background: 'var(--bg-base)',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    color: 'var(--text-primary)',
-                                    fontSize: 14,
-                                    appearance: 'none',
-                                    cursor: 'pointer',
-                                    outline: 'none',
-                                }}
-                            >
-                                {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                            <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                            {loadingCompanies ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 13, padding: '10px 0' }}>
+                                    <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                    Loading companies…
+                                    <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+                                </div>
+                            ) : companies.length > 0 ? (
+                                <>
+                                    <select
+                                        value={answers[q.id] || ''}
+                                        onChange={e => set(q.id, e.target.value)}
+                                        style={{ width: '100%', padding: '10px 36px 10px 14px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 14, appearance: 'none', cursor: 'pointer', outline: 'none' }}
+                                    >
+                                        {companies.map(c => <option key={c.id || c.name} value={c.name}>{c.name}</option>)}
+                                    </select>
+                                    <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+                                </>
+                            ) : (
+                                <input
+                                    type="text"
+                                    placeholder="Type company name…"
+                                    value={answers[q.id] || ''}
+                                    onChange={e => set(q.id, e.target.value)}
+                                    style={{ width: '100%', padding: '10px 14px', background: 'var(--bg-base)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                                />
+                            )}
                         </div>
                     )}
 
@@ -121,16 +240,7 @@ export default function CompanyReview({ requireAuth }) {
                             {[1, 2, 3, 4, 5].map(n => {
                                 const sel = answers[q.id] === n
                                 return (
-                                    <button key={n} onClick={() => set(q.id, n)} style={{
-                                        width: 40, height: 40,
-                                        borderRadius: 8,
-                                        border: `1px solid ${sel ? 'var(--accent-blue)' : 'var(--border)'}`,
-                                        background: sel ? 'var(--accent-blue-dim)' : 'var(--bg-base)',
-                                        color: sel ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                                        fontWeight: sel ? 600 : 400,
-                                        fontSize: 14,
-                                        transition: 'all 0.15s',
-                                    }}>{n}</button>
+                                    <button key={n} onClick={() => set(q.id, n)} style={{ width: 40, height: 40, borderRadius: 8, border: `1px solid ${sel ? 'var(--accent-blue)' : 'var(--border)'}`, background: sel ? 'var(--accent-blue-dim)' : 'var(--bg-base)', color: sel ? 'var(--accent-blue)' : 'var(--text-secondary)', fontWeight: sel ? 600 : 400, fontSize: 14, transition: 'all 0.15s', cursor: 'pointer' }}>{n}</button>
                                 )
                             })}
                         </div>
@@ -141,16 +251,7 @@ export default function CompanyReview({ requireAuth }) {
                             {q.options.map(opt => {
                                 const sel = answers[q.id] === opt
                                 return (
-                                    <button key={opt} onClick={() => set(q.id, opt)} style={{
-                                        padding: '6px 16px',
-                                        borderRadius: 99,
-                                        border: `1px solid ${sel ? 'var(--accent-blue)' : 'var(--border)'}`,
-                                        background: sel ? 'var(--accent-blue-dim)' : 'var(--bg-base)',
-                                        color: sel ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                                        fontSize: 13,
-                                        fontWeight: sel ? 500 : 400,
-                                        transition: 'all 0.15s',
-                                    }}>{opt}</button>
+                                    <button key={opt} onClick={() => set(q.id, opt)} style={{ padding: '6px 16px', borderRadius: 99, border: `1px solid ${sel ? 'var(--accent-blue)' : 'var(--border)'}`, background: sel ? 'var(--accent-blue-dim)' : 'var(--bg-base)', color: sel ? 'var(--accent-blue)' : 'var(--text-secondary)', fontSize: 13, fontWeight: sel ? 500 : 400, transition: 'all 0.15s', cursor: 'pointer' }}>{opt}</button>
                                 )
                             })}
                         </div>
@@ -158,23 +259,12 @@ export default function CompanyReview({ requireAuth }) {
                 </div>
             ))}
 
-            {/* Submit */}
             <button
                 onClick={handleSubmit}
-                style={{
-                    padding: '13px',
-                    borderRadius: 'var(--radius-md)',
-                    background: progress === 100 ? 'var(--accent-blue)' : 'var(--bg-card)',
-                    color: progress === 100 ? '#fff' : 'var(--text-muted)',
-                    fontWeight: 600,
-                    fontSize: 14,
-                    border: `1px solid ${progress === 100 ? 'transparent' : 'var(--border)'}`,
-                    transition: 'all 0.2s',
-                    cursor: progress === 100 ? 'pointer' : 'not-allowed',
-                    marginBottom: 8,
-                }}
+                disabled={submitting || !allQuestionsAnswered}
+                style={{ padding: '13px', borderRadius: 'var(--radius-md)', background: allQuestionsAnswered ? 'var(--accent-blue)' : 'var(--bg-card)', color: allQuestionsAnswered ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: 14, border: `1px solid ${allQuestionsAnswered ? 'transparent' : 'var(--border)'}`, transition: 'all 0.2s', cursor: allQuestionsAnswered && !submitting ? 'pointer' : 'not-allowed', marginBottom: 8, opacity: submitting ? 0.7 : 1 }}
             >
-                Submit review {progress < 100 ? `(${10 - answered} remaining)` : '· Earn +10 credits'}
+                {submitting ? 'Submitting…' : allQuestionsAnswered ? 'Submit review · Earn +10 credits' : `Complete form (${answered}/${QUESTIONS.length})`}
             </button>
         </div>
     )

@@ -1,19 +1,30 @@
 import { useState } from 'react'
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
+import { forgotPassword } from '../service/auth.js'
 
 export default function ForgotPassword({ onNavigate }) {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setError('')
     setSubmitting(true)
-    setTimeout(() => {
-      setSubmitting(false)
+    try {
+      await forgotPassword({ email })
       setSent(true)
-    }, 600)
+    } catch (err) {
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        'Failed to send reset email. Please try again.'
+      setError(String(message))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -25,6 +36,11 @@ export default function ForgotPassword({ onNavigate }) {
           : 'Enter the email linked to your account and we will send reset instructions.'
       }
     >
+      {error && (
+        <div className="auth-alert auth-alert--info" style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)' }}>
+          {error}
+        </div>
+      )}
       {sent ? (
         <>
           <div className="auth-alert auth-alert--success">
@@ -38,7 +54,7 @@ export default function ForgotPassword({ onNavigate }) {
             className="auth-btn auth-btn--primary"
             onClick={() => onNavigate?.('reset-password')}
           >
-            Enter reset code
+            Continue
           </button>
           <p className="auth-footer">
             <button type="button" className="auth-link" onClick={() => setSent(false)}>

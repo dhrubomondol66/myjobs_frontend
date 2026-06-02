@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Lock, Eye, EyeOff, ArrowLeft, KeyRound } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
+import { resetPassword } from '../service/auth.js'
 
 function getPasswordStrength(password) {
   if (!password) return { score: 0, label: '' }
@@ -14,55 +15,55 @@ function getPasswordStrength(password) {
 }
 
 export default function ResetPassword({ onNavigate, onAuthenticated }) {
-  const [code, setCode] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
-  const strength = useMemo(() => getPasswordStrength(password), [password])
-  const passwordsMatch = !confirm || password === confirm
+  const strength = useMemo(() => getPasswordStrength(newPassword), [newPassword])
+  const passwordsMatch = !confirmPassword || newPassword === confirmPassword
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (password !== confirm) return
+    if (newPassword !== confirmPassword) return
+    setError('')
     setSubmitting(true)
-    setTimeout(() => {
+    try {
+      await resetPassword({
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      })
+      // After resetting password, user should log in again.
+      onNavigate?.('login')
+    } catch (err) {
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        'Failed to reset password. Please try again.'
+      setError(String(message))
+    } finally {
       setSubmitting(false)
-      onAuthenticated?.()
-    }, 600)
+    }
   }
 
   return (
     <AuthLayout
       title="Set a new password"
-      subtitle="Enter the code from your email and choose a new password."
+      subtitle="Choose a new password for your account."
     >
       <div className="auth-alert auth-alert--info">
         <KeyRound size={18} style={{ flexShrink: 0 }} />
         <span>Reset codes expire after 30 minutes for your security.</span>
       </div>
 
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <div className="auth-field">
-          <label className="auth-label" htmlFor="reset-code">
-            Reset code
-          </label>
-          <input
-            id="reset-code"
-            className="auth-input auth-input--icon"
-            type="text"
-            placeholder="6-digit code"
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            required
-            minLength={6}
-            maxLength={6}
-          />
+      {error && (
+        <div className="auth-alert auth-alert--info" style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)' }}>
+          {error}
         </div>
+      )}
 
+      <form className="auth-form" onSubmit={handleSubmit}>
         <div className="auth-field">
           <label className="auth-label" htmlFor="reset-password">
             New password
@@ -76,8 +77,8 @@ export default function ResetPassword({ onNavigate, onAuthenticated }) {
               className="auth-input"
               type={showPassword ? 'text' : 'password'}
               placeholder="At least 8 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
               autoComplete="new-password"
               required
               minLength={8}
@@ -121,8 +122,8 @@ export default function ResetPassword({ onNavigate, onAuthenticated }) {
             className="auth-input auth-input--icon"
             type={showPassword ? 'text' : 'password'}
             placeholder="Repeat your password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
             required
           />
@@ -134,7 +135,7 @@ export default function ResetPassword({ onNavigate, onAuthenticated }) {
         <button
           type="submit"
           className="auth-btn auth-btn--primary"
-          disabled={submitting || !passwordsMatch || code.length < 6}
+          disabled={submitting || !passwordsMatch}
         >
           {submitting ? 'Updating…' : 'Update password'}
         </button>

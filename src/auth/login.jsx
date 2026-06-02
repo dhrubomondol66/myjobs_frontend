@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
+import { loginUser } from '../service/auth.js'
+import { setAuthTokens } from './authStorage.js'
 
 export default function Login({ onNavigate, onAuthenticated }) {
   const [email, setEmail] = useState('')
@@ -8,14 +10,28 @@ export default function Login({ onNavigate, onAuthenticated }) {
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setError('')
     setSubmitting(true)
-    setTimeout(() => {
-      setSubmitting(false)
+    try {
+      const { data } = await loginUser({ email, password })
+      setAuthTokens({ access: data?.access, refresh: data?.refresh })
+      if (remember) {
+        // tokens already stored; keep checkbox for UX parity
+      }
       onAuthenticated?.()
-    }, 600)
+    } catch (err) {
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        'Login failed. Please check your email and password.'
+      setError(String(message))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -23,6 +39,11 @@ export default function Login({ onNavigate, onAuthenticated }) {
       title="Welcome back"
       subtitle="Sign in to submit reviews and unlock salary insights."
     >
+      {error && (
+        <div className="auth-alert auth-alert--info" style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.08)' }}>
+          {error}
+        </div>
+      )}
       <form className="auth-form" onSubmit={handleSubmit}>
         <div className="auth-field">
           <label className="auth-label" htmlFor="login-email">

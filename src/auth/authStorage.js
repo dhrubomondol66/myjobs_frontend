@@ -1,13 +1,16 @@
-const AUTH_KEY = 'myjobs_authenticated'
+const ACCESS_KEY = 'access'
+const REFRESH_KEY = 'refresh'
 
 export function readAuthenticated() {
-  return localStorage.getItem(AUTH_KEY) === 'true'
+  return Boolean(localStorage.getItem(ACCESS_KEY))
 }
 
-export function writeAuthenticated(value) {
-  if (value) {
-    localStorage.setItem(AUTH_KEY, 'true')
-  } else {
-    localStorage.removeItem(AUTH_KEY)
-  }
+export function setAuthTokens({ access, refresh }) {
+  if (access) localStorage.setItem(ACCESS_KEY, access)
+  if (refresh) localStorage.setItem(REFRESH_KEY, refresh)
+}
+
+export function clearAuthTokens() {
+  localStorage.removeItem(ACCESS_KEY)
+  localStorage.removeItem(REFRESH_KEY)
 }

@@ -242,7 +242,7 @@
 }
 
 .auth-input:not(.auth-input--icon) {
-  padding-left: 12px;
+  padding-left: 33px;
 }
 
 .auth-input:focus {

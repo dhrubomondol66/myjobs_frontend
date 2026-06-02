@@ -24,8 +24,16 @@ export default function Topbar({
   onNavigate,
   onNavigateAuth,
   isAuthenticated,
-  userInitials = 'AK',
-}) {
+  userName = 'User',
+  credits = 0,
+}) {  
+  const Initials = (userName || 'U?')
+    .split(/[\s.@]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join('')
+    .toUpperCase()
   const goToProfile = () => {
     onNavigate('my-profile')
   }
@@ -60,7 +68,7 @@ export default function Topbar({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {isAuthenticated && (
+        {/* {isAuthenticated && (
           <button
             type="button"
             onClick={goToProfile}
@@ -87,7 +95,7 @@ export default function Topbar({
             }}
           >
             <Coins size={13} />
-            45 credits
+            {credits} credits
           </button>
         )}
 
@@ -131,7 +139,7 @@ export default function Topbar({
               }}
             />
           )}
-        </button>
+        </button> */}
 
         {isAuthenticated ? (
           <button
@@ -161,7 +169,7 @@ export default function Topbar({
               e.currentTarget.style.opacity = '1'
             }}
           >
-            {userInitials}
+            {Initials}
           </button>
         ) : (
           <>

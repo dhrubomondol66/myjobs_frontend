@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LayoutDashboard, Star, DollarSign, Building2, User, ChevronLeft } from 'lucide-react'
+import { LayoutDashboard, Star, DollarSign, Building2, User, ChevronLeft, LogOut } from 'lucide-react'
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -9,7 +9,7 @@ const NAV = [
   { id: 'my-profile', label: 'My profile', icon: User },
 ]
 
-export default function Sidebar({ activePage, onNavigate }) {
+export default function Sidebar({ activePage, onNavigate, onLogout }) {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
@@ -71,8 +71,8 @@ export default function Sidebar({ activePage, onNavigate }) {
               width: '100%',
               border: 'none',
             }}
-            onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)' }}}
-            onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' }}}
+              onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)' } }}
+              onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' } }}
             >
               <Icon size={16} strokeWidth={1.8} />
               {!collapsed && <span>{label}</span>}
@@ -82,7 +82,7 @@ export default function Sidebar({ activePage, onNavigate }) {
       </nav>
 
       {/* Collapse toggle */}
-      <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border-subtle)' }}>
+      <div style={{ padding: '12px 8px', borderTop: '1px solid var(--border-subtle)'}}>
         <button onClick={() => setCollapsed(c => !c)} style={{
           display: 'flex',
           alignItems: 'center',
@@ -96,12 +96,46 @@ export default function Sidebar({ activePage, onNavigate }) {
           transition: 'background 0.15s, color 0.15s',
           border: 'none',
         }}
-        onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)' }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' }}
         >
           <ChevronLeft size={16} style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.25s' }} />
           {!collapsed && <span>Collapse</span>}
         </button>
+        {/* <button
+          type="button"
+          onClick={onLogout}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            width:'100%',
+            padding: '8px 14px',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-subtle)',
+            background: 'var(--bg-base)',
+            color: 'var(--text-secondary)',
+            fontSize: 13,
+            fontWeight: 500,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            flexShrink: 0,
+            transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'
+            e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.35)'
+            e.currentTarget.style.color = '#ef4444'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'var(--bg-base)'
+            e.currentTarget.style.borderColor = 'var(--border-subtle)'
+            e.currentTarget.style.color = 'var(--text-secondary)'
+          }}
+        >
+          <LogOut size={15} />
+          Log out
+        </button> */}
       </div>
     </aside>
   )
