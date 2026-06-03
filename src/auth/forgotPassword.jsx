@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
 import { forgotPassword } from '../service/auth.js'
-import { sendPasswordResetEmail } from '../service/emailService.js'
 
 export default function ForgotPassword({ onNavigate }) {
   const [email, setEmail] = useState('')
@@ -15,20 +14,13 @@ export default function ForgotPassword({ onNavigate }) {
     setError('')
     setSubmitting(true)
     try {
-      // Option 1: Call backend to validate email and get reset token
-      const response = await forgotPassword({ email })
-      
-      // Option 2: Send reset email via EmailJS with reset link/code
-      const resetToken = response?.data?.reset_token || 'reset-code-here'
-      const resetLink = `${import.meta.env.VITE_RESET_PASSWORD_URL}?token=${resetToken}`
-      
-      await sendPasswordResetEmail(email, resetLink, email.split('@')[0])
-      
+      await forgotPassword({ email })  // backend sends email via Brevo
       setSent(true)
     } catch (err) {
       const message =
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
+        err?.response?.data?.error ||
         err?.message ||
         'Failed to send reset email. Please try again.'
       setError(String(message))
@@ -59,13 +51,6 @@ export default function ForgotPassword({ onNavigate }) {
               If <strong>{email}</strong> is registered, you will receive an email shortly.
             </span>
           </div>
-          <button
-            type="button"
-            className="auth-btn auth-btn--primary"
-            onClick={() => onNavigate?.('reset-password')}
-          >
-            Continue
-          </button>
           <p className="auth-footer">
             <button type="button" className="auth-link" onClick={() => setSent(false)}>
               Try a different email
