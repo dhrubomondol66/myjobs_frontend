@@ -21,10 +21,10 @@ export default function ResetPassword({ onNavigate }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Extract uid and token from URL
-  const pathParts = window.location.pathname.split('/')
-  const uid = pathParts[pathParts.length - 3]
-  const token = pathParts[pathParts.length - 2]
+  // Extract uid and token from hash: #/reset-password/uid/token/
+  const hashParts = window.location.hash.replace(/^#\/?/, '').split('/')
+  const uid = hashParts[1]
+  const token = hashParts[2]
 
   const strength = useMemo(() => getPasswordStrength(newPassword), [newPassword])
   const passwordsMatch = !confirmPassword || newPassword === confirmPassword
@@ -38,8 +38,8 @@ export default function ResetPassword({ onNavigate }) {
       await resetPassword({
         uid,
         token,
-        newPassword,
-        confirmPassword,
+        new_password: newPassword,       // ← fixed
+        confirm_password: confirmPassword, // ← fixed
       })
       onNavigate?.('login')
     } catch (err) {
