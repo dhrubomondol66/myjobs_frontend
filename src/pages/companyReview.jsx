@@ -264,7 +264,7 @@ export default function CompanyReview({ requireAuth, onReviewComplete, onNavigat
                 disabled={submitting || !allQuestionsAnswered}
                 style={{ padding: '13px', borderRadius: 'var(--radius-md)', background: allQuestionsAnswered ? 'var(--accent-blue)' : 'var(--bg-card)', color: allQuestionsAnswered ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: 14, border: `1px solid ${allQuestionsAnswered ? 'transparent' : 'var(--border)'}`, transition: 'all 0.2s', cursor: allQuestionsAnswered && !submitting ? 'pointer' : 'not-allowed', marginBottom: 8, opacity: submitting ? 0.7 : 1 }}
             >
-                {submitting ? 'Submitting…' : allQuestionsAnswered ? 'Submit review · Earn +10 credits' : `Complete form (${answered}/${QUESTIONS.length})`}
+                {submitting ? 'Submitting…' : allQuestionsAnswered ? 'Submit review' : `Complete form (${answered}/${QUESTIONS.length})`}
             </button>
         </div>
     )

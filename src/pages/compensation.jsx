@@ -41,7 +41,7 @@ export default function Compensation({ requireAuth, hasReviewed, onNavigate }) {
         console.log("🔍 Review data in localStorage:")
         console.log("   - review_company_name:", companyName, typeof companyName)
         console.log("   - review_company_id:", companyId, typeof companyId)
-        
+
         if (companyName && typeof companyName === 'string' && companyName.trim()) {
             console.log("✅ Setting company to:", companyName)
             setData(prev => ({ ...prev, company: companyName.trim() }))
@@ -63,14 +63,14 @@ export default function Compensation({ requireAuth, hasReviewed, onNavigate }) {
                 </div>
                 <button
                     onClick={() => onNavigate('company-review')}
-                    style={{ 
-                        padding: '12px 28px', 
-                        borderRadius: 'var(--radius-md)', 
-                        background: 'var(--accent-blue)', 
-                        color: '#fff', 
-                        fontWeight: 500, 
-                        fontSize: 14, 
-                        border: 'none', 
+                    style={{
+                        padding: '12px 28px',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--accent-blue)',
+                        color: '#fff',
+                        fontWeight: 500,
+                        fontSize: 14,
+                        border: 'none',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
@@ -112,7 +112,7 @@ export default function Compensation({ requireAuth, hasReviewed, onNavigate }) {
                     setLoading(false)
                     return
                 }
-                
+
                 const payload = {
                     company: String(data.company).trim(),  // Company name as string (e.g., "Grameenphone")
                     job_title: data.job_title,
@@ -129,10 +129,10 @@ export default function Compensation({ requireAuth, hasReviewed, onNavigate }) {
                 console.log("📋 Validation - Bonus type:", typeof data.bonus, "Value:", data.bonus)
                 console.log("📋 Validation - Fringe type:", typeof data.fringe, "Value:", data.fringe)
                 console.log("📋 Final Compensation payload:", JSON.stringify(payload, null, 2))
-                await createCompensation(payload)
-                localStorage.removeItem('review_company_id')
-                localStorage.removeItem('review_company_name')
                 setSubmitted(true)
+                setTimeout(() => {
+                    window.location.reload()  // ← add this
+                }, 2000)
             } catch (err) {
                 const errData = err.response?.data
                 if (errData && typeof errData === 'object') {
@@ -356,7 +356,7 @@ export default function Compensation({ requireAuth, hasReviewed, onNavigate }) {
                     className="submit-button enabled"
                     style={{ cursor: loading ? 'wait' : 'pointer' }}
                 >
-                    {loading ? 'Submitting...' : 'Submit · Earn +15 credits'}
+                    {loading ? 'Submitting...' : 'Submit'}
                 </button>
             )}
         </div>
