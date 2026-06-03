@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Lock, Eye, EyeOff, ArrowLeft, KeyRound } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
-import API from '../service/auth.js'
+import { resetPassword } from '../service/auth.js'
 
 function getPasswordStrength(password) {
   if (!password) return { score: 0, label: '' }
@@ -35,11 +35,11 @@ export default function ResetPassword({ onNavigate }) {
     setError('')
     setSubmitting(true)
     try {
-      await API.post('/accounts/reset-password/', {
+      await resetPassword({
         uid,
         token,
-        new_password: newPassword,
-        confirm_password: confirmPassword,
+        newPassword,
+        confirmPassword,
       })
       onNavigate?.('login')
     } catch (err) {
