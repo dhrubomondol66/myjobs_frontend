@@ -34,6 +34,14 @@ export default function ResetPassword({ onNavigate }) {
     if (newPassword !== confirmPassword) return
     setError('')
     setSubmitting(true)
+    
+    // DEBUG - remove after fixing
+    console.log('hash:', window.location.hash)
+    console.log('hashParts:', window.location.hash.replace(/^#\/?/, '').split('/'))
+    console.log('uid:', uid)
+    console.log('token:', token)
+    console.log('sending:', { uid, token, new_password: newPassword, confirm_password: confirmPassword })
+
     try {
       await resetPassword({
         uid,
