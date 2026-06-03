@@ -10,8 +10,11 @@ import { readAuthenticated, clearAuthTokens } from './auth/authStorage.js'
 import { getMyProfile } from './service/myprofile.js'
 
 function getAuthPageFromHash() {
-  const page = window.location.hash.replace(/^#\/?/, '')
-  return AUTH_PAGES.includes(page) ? page : null
+  const hash = window.location.hash.replace(/^#\/?/, '')  // ← was 'page', now 'hash'
+  if (hash.startsWith('reset-password/')) {
+    return 'reset-password'
+  }
+  return AUTH_PAGES.includes(hash) ? hash : null
 }
 
 function App() {

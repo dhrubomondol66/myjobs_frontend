@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Lock, Eye, EyeOff, ArrowLeft, KeyRound } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
-import { resetPassword } from '../service/auth.js'
+import API from '../api.js'
 
 function getPasswordStrength(password) {
   if (!password) return { score: 0, label: '' }
@@ -14,12 +14,17 @@ function getPasswordStrength(password) {
   return { score, label: labels[score] }
 }
 
-export default function ResetPassword({ onNavigate, onAuthenticated }) {
+export default function ResetPassword({ onNavigate }) {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  // Extract uid and token from URL
+  const pathParts = window.location.pathname.split('/')
+  const uid = pathParts[pathParts.length - 3]
+  const token = pathParts[pathParts.length - 2]
 
   const strength = useMemo(() => getPasswordStrength(newPassword), [newPassword])
   const passwordsMatch = !confirmPassword || newPassword === confirmPassword
@@ -30,17 +35,19 @@ export default function ResetPassword({ onNavigate, onAuthenticated }) {
     setError('')
     setSubmitting(true)
     try {
-      await resetPassword({
+      await API.post('/accounts/reset-password/', {
+        uid,
+        token,
         new_password: newPassword,
         confirm_password: confirmPassword,
       })
-      // After resetting password, user should log in again.
       onNavigate?.('login')
     } catch (err) {
       const message =
         err?.response?.data?.detail ||
         err?.response?.data?.message ||
-        'Failed to reset password. Please try again.'
+        err?.response?.data?.error ||
+        'Failed to reset password. The link may be expired.'
       setError(String(message))
     } finally {
       setSubmitting(false)
@@ -54,7 +61,7 @@ export default function ResetPassword({ onNavigate, onAuthenticated }) {
     >
       <div className="auth-alert auth-alert--info">
         <KeyRound size={18} style={{ flexShrink: 0 }} />
-        <span>Reset codes expire after 30 minutes for your security.</span>
+        <span>Reset links expire after 24 hours for your security.</span>
       </div>
 
       {error && (
@@ -92,7 +99,7 @@ export default function ResetPassword({ onNavigate, onAuthenticated }) {
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-          {password && (
+          {newPassword && (
             <>
               <div className="auth-strength" aria-hidden="true">
                 {[1, 2, 3, 4].map((i) => (
