@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Lock, Eye, EyeOff, ArrowLeft, KeyRound } from 'lucide-react'
 import AuthLayout from './AuthLayout.jsx'
-import API from '../api.js'
+import API from '../service/auth.js'
 
 function getPasswordStrength(password) {
   if (!password) return { score: 0, label: '' }
